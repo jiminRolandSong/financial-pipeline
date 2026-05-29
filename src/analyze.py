@@ -111,7 +111,8 @@ def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
         },
         timeout=60,
     )
-    response.raise_for_status()
+    if not response.ok:
+        raise RuntimeError(f'Anthropic API error {response.status_code}: {response.text}')
     response_text = response.json()['content'][0]['text']
     clean = response_text.replace('```json', '').replace('```', '').strip()
     return json.loads(clean)
