@@ -105,7 +105,7 @@ def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
             'content-type': 'application/json',
         },
         json={
-            'model': 'claude-sonnet-4-5',
+            'model': 'claude-sonnet-4-6',
             'max_tokens': 1000,
             'messages': [{'role': 'user', 'content': prompt}],
         },
