@@ -129,9 +129,13 @@ with tab1:
 with tab2:
     if st.button('🤖 Generate Weekly Report'):
         with st.spinner('Analyzing with Claude AI...'):
-            weekly_df = fetch_weekly_data()
-            anomalies = detect_anomalies(weekly_df)
-            report = generate_weekly_report(weekly_df, anomalies)
+            try:
+                weekly_df = fetch_weekly_data()
+                anomalies = detect_anomalies(weekly_df)
+                report = generate_weekly_report(weekly_df, anomalies)
+            except Exception as e:
+                st.error(f'Error: {type(e).__name__}: {e}')
+                st.stop()
 
         st.subheader('Weekly Summary')
         st.write(report['summary'])
