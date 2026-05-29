@@ -117,7 +117,7 @@ Return ONLY a JSON object with these exact keys:
         },
         json={
             'model': 'claude-sonnet-4-6',
-            'max_tokens': 1000,
+            'max_tokens': 2000,
             'messages': [{'role': 'user', 'content': prompt}],
         },
         timeout=60,
