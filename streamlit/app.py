@@ -127,6 +127,12 @@ with tab1:
     st.plotly_chart(fig2, use_container_width=True)
 
 with tab2:
+    api_key = os.getenv('ANTHROPIC_API_KEY', '')
+    if not api_key:
+        st.warning('ANTHROPIC_API_KEY not found in secrets. Add it in Streamlit Cloud → Settings → Secrets.')
+    else:
+        st.caption(f'API key loaded: sk-ant-...{api_key[-6:]}')
+
     if st.button('🤖 Generate Weekly Report'):
         with st.spinner('Analyzing with Claude AI...'):
             try:
