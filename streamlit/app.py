@@ -149,6 +149,12 @@ with tab2:
         st.subheader('Anomalies')
         st.write(report['anomalies_explanation'])
 
+        st.subheader('Correlation')
+        st.write(report.get('correlation_insight', ''))
+
+        st.subheader('Risk Factors')
+        st.write(report.get('risk_factors', ''))
+
         col3, col4 = st.columns(2)
         with col3:
             risk = report['risk_score']

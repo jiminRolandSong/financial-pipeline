@@ -78,24 +78,35 @@ def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
             }
 
     prompt = f"""
-    You are a financial analyst. Analyze this week's stock data and generate a concise report.
+You are a senior quantitative analyst at a hedge fund. Analyze this week's stock data for TSLA and NVDA with depth and precision.
 
-    Weekly Data:
-    {json.dumps(summary_data, indent=2)}
+Weekly Performance Data:
+{json.dumps(summary_data, indent=2)}
 
-    Anomalies (daily return > {ANOMALY_THRESHOLD * 100:.0f}%):
-    {json.dumps(anomalies, indent=2)}
+Anomalies detected (daily return exceeded {ANOMALY_THRESHOLD * 100:.0f}% threshold):
+{json.dumps(anomalies, indent=2)}
 
-    Return ONLY a JSON object with these exact keys:
-    {{
-        "summary": "2-3 sentence overview of the week",
-        "tsla_analysis": "1-2 sentences on TSLA performance",
-        "nvda_analysis": "1-2 sentences on NVDA performance",
-        "anomalies_explanation": "explanation of any anomalies, or 'No significant anomalies this week'",
-        "risk_score": <integer 1-10>,
-        "outlook": "brief outlook for next week"
-    }}
-    """
+Provide a rigorous analysis covering:
+
+1. **Performance comparison** — which stock outperformed and why the divergence matters
+2. **Technical positioning** — both stocks relative to their SMA-20 (above = bullish, below = bearish, % distance matters)
+3. **Volume analysis** — what the volume levels suggest about conviction behind the moves
+4. **Anomaly deep-dive** — if anomalies exist, what likely caused them (earnings, macro, sector rotation)
+5. **Correlation** — are TSLA and NVDA moving together or diverging? What does that signal?
+6. **Risk assessment** — specific risks for each stock next week
+
+Return ONLY a JSON object with these exact keys:
+{{
+    "summary": "3-4 sentences with specific numbers, percentage moves, and what they mean",
+    "tsla_analysis": "2-3 sentences covering price vs SMA-20, volume conviction, and key level to watch",
+    "nvda_analysis": "2-3 sentences covering price vs SMA-20, volume conviction, and key level to watch",
+    "anomalies_explanation": "specific explanation with likely catalysts, or 'No significant anomalies this week'",
+    "correlation_insight": "1-2 sentences on whether stocks are correlated or diverging this week",
+    "risk_score": <integer 1-10, where 1=very low volatility, 10=extreme risk>,
+    "risk_factors": "2-3 specific risk factors to watch next week",
+    "outlook": "2-3 sentences with specific price levels or catalysts to monitor"
+}}
+"""
 
     response = requests.post(
         'https://api.anthropic.com/v1/messages',
