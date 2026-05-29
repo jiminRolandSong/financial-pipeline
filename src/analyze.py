@@ -62,8 +62,7 @@ def detect_anomalies(df: pd.DataFrame) -> list:
 
 
 def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
-    from anthropic import Anthropic
-    client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+    import requests
 
     summary_data = {}
     for symbol in df['symbol'].unique():
@@ -98,13 +97,22 @@ def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
     }}
     """
 
-    message = client.messages.create(
-        model='claude-sonnet-4-20250514',
-        max_tokens=1000,
-        messages=[{'role': 'user', 'content': prompt}]
+    response = requests.post(
+        'https://api.anthropic.com/v1/messages',
+        headers={
+            'x-api-key': os.getenv('ANTHROPIC_API_KEY', ''),
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+        },
+        json={
+            'model': 'claude-sonnet-4-20250514',
+            'max_tokens': 1000,
+            'messages': [{'role': 'user', 'content': prompt}],
+        },
+        timeout=60,
     )
-
-    response_text = message.content[0].text
+    response.raise_for_status()
+    response_text = response.json()['content'][0]['text']
     clean = response_text.replace('```json', '').replace('```', '').strip()
     return json.loads(clean)
 
