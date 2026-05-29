@@ -5,11 +5,33 @@ import json
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
 sys.path.append(str(Path(__file__).parent.parent / 'src'))
 
-load_dotenv(dotenv_path=Path(__file__).parent.parent / '.env')
+
+def _secret(key: str) -> str:
+    """Read from st.secrets first, fall back to env (local dev with .env)."""
+    try:
+        return st.secrets[key]
+    except (KeyError, FileNotFoundError):
+        return os.getenv(key, '')
+
+
+def _inject_secrets_to_env():
+    """Push Streamlit secrets into os.environ so src/ modules can read them via os.getenv."""
+    keys = [
+        'GCP_PROJECT_ID', 'BQ_DATASET',
+        'GOOGLE_APPLICATION_CREDENTIALS_JSON',
+        'ANTHROPIC_API_KEY',
+        'S3_BUCKET_NAME', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'APP_REGION',
+    ]
+    for key in keys:
+        val = _secret(key)
+        if val:
+            os.environ[key] = val
+
+
+_inject_secrets_to_env()
 
 from analyze import fetch_weekly_data, detect_anomalies, generate_weekly_report
 
@@ -22,16 +44,16 @@ st.set_page_config(
 st.title('📈 Financial Intelligence Dashboard')
 st.caption('TSLA & NVDA — Powered by AWS S3, BigQuery, Claude AI')
 
-# 데이터 로드
+
 @st.cache_data(ttl=3600)
 def load_data():
     from google.cloud import bigquery
     from google.oauth2 import service_account
 
-    GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID')
-    BQ_DATASET = os.getenv('BQ_DATASET')
+    GCP_PROJECT_ID = _secret('GCP_PROJECT_ID')
+    BQ_DATASET = _secret('BQ_DATASET')
 
-    creds_raw = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+    creds_raw = _secret('GOOGLE_APPLICATION_CREDENTIALS_JSON')
     if creds_raw:
         creds_json = json.loads(creds_raw)
         credentials = service_account.Credentials.from_service_account_info(creds_json)
@@ -40,7 +62,7 @@ def load_data():
         bq = bigquery.Client(project=GCP_PROJECT_ID)
 
     query = f"""
-        SELECT 
+        SELECT
             s.symbol,
             d.full_date,
             f.open_price,
@@ -57,17 +79,15 @@ def load_data():
     """
     return bq.query(query).to_dataframe()
 
+
 df = load_data()
 
-# 탭 구성
 tab1, tab2, tab3 = st.tabs(['📊 Stock Charts', '🤖 AI Report', '🏗️ Architecture'])
 
-# 탭 1 — 주가 차트
 with tab1:
     symbol = st.selectbox('Select Stock', ['TSLA', 'NVDA'])
     symbol_df = df[df['symbol'] == symbol].sort_values('full_date')
 
-    # 주가 라인 차트 + SMA
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=symbol_df['full_date'],
@@ -90,7 +110,6 @@ with tab1:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # 거래량 차트
     fig2 = go.Figure()
     fig2.add_trace(go.Bar(
         x=symbol_df['full_date'],
@@ -107,7 +126,6 @@ with tab1:
     )
     st.plotly_chart(fig2, use_container_width=True)
 
-# 탭 2 — AI 리포트
 with tab2:
     if st.button('🤖 Generate Weekly Report'):
         with st.spinner('Analyzing with Claude AI...'):
@@ -138,7 +156,6 @@ with tab2:
             st.subheader('Outlook')
             st.write(report['outlook'])
 
-# 탭 3 — 아키텍처
 with tab3:
     st.subheader('Pipeline Architecture')
     st.code("""
