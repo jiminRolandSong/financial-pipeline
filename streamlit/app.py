@@ -9,6 +9,11 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent / 'src'))
 
 
+def _md(text: str) -> None:
+    """Render report text safely — escapes $ so Streamlit doesn't treat it as LaTeX."""
+    st.markdown(text.replace('$', r'\$'))
+
+
 def _secret(key: str) -> str:
     try:
         return st.secrets[key]
@@ -136,24 +141,24 @@ with tab2:
                 st.stop()
 
         st.subheader('Weekly Summary')
-        st.write(report['summary'])
+        _md(report['summary'])
 
         col1, col2 = st.columns(2)
         with col1:
             st.subheader('TSLA')
-            st.write(report['tsla_analysis'])
+            _md(report['tsla_analysis'])
         with col2:
             st.subheader('NVDA')
-            st.write(report['nvda_analysis'])
+            _md(report['nvda_analysis'])
 
         st.subheader('Anomalies')
-        st.write(report['anomalies_explanation'])
+        _md(report['anomalies_explanation'])
 
         st.subheader('Correlation')
-        st.write(report.get('correlation_insight', ''))
+        _md(report.get('correlation_insight', ''))
 
         st.subheader('Risk Factors')
-        st.write(report.get('risk_factors', ''))
+        _md(report.get('risk_factors', ''))
 
         col3, col4 = st.columns(2)
         with col3:
@@ -162,7 +167,7 @@ with tab2:
             st.metric('Risk Score', f'{color} {risk} / 10')
         with col4:
             st.subheader('Outlook')
-            st.write(report['outlook'])
+            _md(report['outlook'])
 
 with tab3:
     st.subheader('Pipeline Architecture')
