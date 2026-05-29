@@ -6,6 +6,22 @@ An end-to-end, fully serverless stock market data pipeline for TSLA and NVDA. Ex
 
 ---
 
+## Dashboard Preview
+
+**Stock Charts — Price + SMA-20 overlay + Volume**
+
+![Stock Charts](images/chart.png)
+
+**AI Weekly Report — Summary, TSLA/NVDA analysis, Anomalies, Correlation**
+
+![AI Report Top](images/ai1.png)
+
+**AI Weekly Report — Risk Factors, Risk Score, Outlook**
+
+![AI Report Bottom](images/ai2.png)
+
+---
+
 ## Architecture
 
 ```
