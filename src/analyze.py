@@ -16,7 +16,6 @@ SMA_WINDOW = 20
 
 GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID')
 BQ_DATASET = os.getenv('BQ_DATASET')
-ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 
 
 def _make_bq_client():
@@ -64,7 +63,7 @@ def detect_anomalies(df: pd.DataFrame) -> list:
 
 def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
     from anthropic import Anthropic
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
     summary_data = {}
     for symbol in df['symbol'].unique():
