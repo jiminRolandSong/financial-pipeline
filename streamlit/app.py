@@ -175,7 +175,7 @@ Anomalies: {json.dumps(anomalies)}"""
                 api_resp = _req.post(
                     'https://api.anthropic.com/v1/messages',
                     headers={
-                        'x-api-key': os.getenv('ANTHROPIC_API_KEY', ''),
+                        'x-api-key': os.getenv('ANTHROPIC_API_KEY', '').strip(),
                         'anthropic-version': '2023-06-01',
                         'content-type': 'application/json',
                     },
