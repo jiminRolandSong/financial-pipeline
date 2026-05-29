@@ -33,7 +33,7 @@ def _inject_secrets_to_env():
 
 _inject_secrets_to_env()
 
-from analyze import fetch_weekly_data, detect_anomalies, generate_weekly_report
+from analyze import fetch_weekly_data, detect_anomalies
 
 st.set_page_config(
     page_title='Financial Intelligence Dashboard',
@@ -149,9 +149,43 @@ with tab2:
     if st.button('🤖 Generate Weekly Report'):
         with st.spinner('Analyzing with Claude AI...'):
             try:
+                import requests as _req
                 weekly_df = fetch_weekly_data()
                 anomalies = detect_anomalies(weekly_df)
-                report = generate_weekly_report(weekly_df, anomalies)
+
+                # build summary inline — bypasses SDK entirely
+                summary_data = {}
+                for sym in weekly_df['symbol'].unique():
+                    sym_df = weekly_df[weekly_df['symbol'] == sym].sort_values('full_date')
+                    if len(sym_df) >= 2:
+                        w_ret = (sym_df['close_price'].iloc[-1] - sym_df['close_price'].iloc[0]) / sym_df['close_price'].iloc[0]
+                        summary_data[sym] = {
+                            'start_price': round(float(sym_df['close_price'].iloc[0]), 2),
+                            'end_price': round(float(sym_df['close_price'].iloc[-1]), 2),
+                            'week_return': round(float(w_ret) * 100, 2),
+                            'avg_volume': int(sym_df['volume'].mean()),
+                        }
+
+                prompt = f"""You are a financial analyst. Analyze this week's stock data and return ONLY a JSON object with these exact keys:
+{{"summary": "2-3 sentence overview", "tsla_analysis": "1-2 sentences", "nvda_analysis": "1-2 sentences", "anomalies_explanation": "explanation or No significant anomalies", "risk_score": <integer 1-10>, "outlook": "brief outlook"}}
+
+Weekly data: {json.dumps(summary_data)}
+Anomalies: {json.dumps(anomalies)}"""
+
+                api_resp = _req.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers={
+                        'x-api-key': os.getenv('ANTHROPIC_API_KEY', ''),
+                        'anthropic-version': '2023-06-01',
+                        'content-type': 'application/json',
+                    },
+                    json={'model': 'claude-sonnet-4-20250514', 'max_tokens': 1000, 'messages': [{'role': 'user', 'content': prompt}]},
+                    timeout=60,
+                )
+                if not api_resp.ok:
+                    raise RuntimeError(f'Anthropic {api_resp.status_code}: {api_resp.text}')
+                raw = api_resp.json()['content'][0]['text']
+                report = json.loads(raw.replace('```json', '').replace('```', '').strip())
             except Exception as e:
                 st.error(f'Error: {type(e).__name__}: {e}')
                 st.stop()
