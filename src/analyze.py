@@ -100,12 +100,12 @@ def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
     response = requests.post(
         'https://api.anthropic.com/v1/messages',
         headers={
-            'x-api-key': os.getenv('ANTHROPIC_API_KEY', ''),
+            'x-api-key': os.getenv('ANTHROPIC_API_KEY', '').strip(),
             'anthropic-version': '2023-06-01',
             'content-type': 'application/json',
         },
         json={
-            'model': 'claude-sonnet-4-6-20260218',
+            'model': 'claude-sonnet-4-5',
             'max_tokens': 1000,
             'messages': [{'role': 'user', 'content': prompt}],
         },

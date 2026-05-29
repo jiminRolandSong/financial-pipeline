@@ -10,7 +10,6 @@ sys.path.append(str(Path(__file__).parent.parent / 'src'))
 
 
 def _secret(key: str) -> str:
-    """Read from st.secrets first, fall back to env (local dev with .env)."""
     try:
         return st.secrets[key]
     except (KeyError, FileNotFoundError):
@@ -18,7 +17,6 @@ def _secret(key: str) -> str:
 
 
 def _inject_secrets_to_env():
-    """Push Streamlit secrets into os.environ so src/ modules can read them via os.getenv."""
     keys = [
         'GCP_PROJECT_ID', 'BQ_DATASET',
         'GOOGLE_APPLICATION_CREDENTIALS_JSON',
@@ -26,14 +24,14 @@ def _inject_secrets_to_env():
         'S3_BUCKET_NAME', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'APP_REGION',
     ]
     for key in keys:
-        val = _secret(key)
+        val = _secret(key).strip()
         if val:
             os.environ[key] = val
 
 
 _inject_secrets_to_env()
 
-from analyze import fetch_weekly_data, detect_anomalies
+from analyze import fetch_weekly_data, detect_anomalies, generate_weekly_report
 
 st.set_page_config(
     page_title='Financial Intelligence Dashboard',
@@ -127,65 +125,12 @@ with tab1:
     st.plotly_chart(fig2, use_container_width=True)
 
 with tab2:
-    api_key = os.getenv('ANTHROPIC_API_KEY', '')
-    if not api_key:
-        st.warning('ANTHROPIC_API_KEY not found in secrets. Add it in Streamlit Cloud → Settings → Secrets.')
-    else:
-        st.caption(f'API key loaded: sk-ant-...{api_key[-6:]}')
-
-    if st.button('🔍 Test Anthropic Connection'):
-        import requests, socket
-        try:
-            ip = socket.gethostbyname('api.anthropic.com')
-            st.success(f'DNS OK — api.anthropic.com resolves to {ip}')
-        except Exception as e:
-            st.error(f'DNS FAIL: {e}')
-        try:
-            r = requests.get('https://api.anthropic.com', timeout=10)
-            st.success(f'HTTP OK — status {r.status_code}')
-        except Exception as e:
-            st.error(f'HTTP FAIL: {type(e).__name__}: {e}')
-
     if st.button('🤖 Generate Weekly Report'):
         with st.spinner('Analyzing with Claude AI...'):
             try:
-                import requests as _req
                 weekly_df = fetch_weekly_data()
                 anomalies = detect_anomalies(weekly_df)
-
-                # build summary inline — bypasses SDK entirely
-                summary_data = {}
-                for sym in weekly_df['symbol'].unique():
-                    sym_df = weekly_df[weekly_df['symbol'] == sym].sort_values('full_date')
-                    if len(sym_df) >= 2:
-                        w_ret = (sym_df['close_price'].iloc[-1] - sym_df['close_price'].iloc[0]) / sym_df['close_price'].iloc[0]
-                        summary_data[sym] = {
-                            'start_price': round(float(sym_df['close_price'].iloc[0]), 2),
-                            'end_price': round(float(sym_df['close_price'].iloc[-1]), 2),
-                            'week_return': round(float(w_ret) * 100, 2),
-                            'avg_volume': int(sym_df['volume'].mean()),
-                        }
-
-                prompt = f"""You are a financial analyst. Analyze this week's stock data and return ONLY a JSON object with these exact keys:
-{{"summary": "2-3 sentence overview", "tsla_analysis": "1-2 sentences", "nvda_analysis": "1-2 sentences", "anomalies_explanation": "explanation or No significant anomalies", "risk_score": <integer 1-10>, "outlook": "brief outlook"}}
-
-Weekly data: {json.dumps(summary_data)}
-Anomalies: {json.dumps(anomalies)}"""
-
-                api_resp = _req.post(
-                    'https://api.anthropic.com/v1/messages',
-                    headers={
-                        'x-api-key': os.getenv('ANTHROPIC_API_KEY', '').strip(),
-                        'anthropic-version': '2023-06-01',
-                        'content-type': 'application/json',
-                    },
-                    json={'model': 'claude-sonnet-4-20250514', 'max_tokens': 1000, 'messages': [{'role': 'user', 'content': prompt}]},
-                    timeout=60,
-                )
-                if not api_resp.ok:
-                    raise RuntimeError(f'Anthropic {api_resp.status_code}: {api_resp.text}')
-                raw = api_resp.json()['content'][0]['text']
-                report = json.loads(raw.replace('```json', '').replace('```', '').strip())
+                report = generate_weekly_report(weekly_df, anomalies)
             except Exception as e:
                 st.error(f'Error: {type(e).__name__}: {e}')
                 st.stop()
