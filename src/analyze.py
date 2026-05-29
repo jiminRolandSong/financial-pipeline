@@ -74,7 +74,14 @@ def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
                 'end_price': round(float(symbol_df['close_price'].iloc[-1]), 2),
                 'week_return': round(float(week_return) * 100, 2),
                 'avg_volume': int(symbol_df['volume'].mean()),
-                'sma_20': round(float(symbol_df['sma_20'].dropna().iloc[-1]), 2) if not symbol_df['sma_20'].dropna().empty else None
+                'sma_20': round(float(symbol_df['sma_20'].dropna().iloc[-1]), 2) if not symbol_df['sma_20'].dropna().empty else None,
+                'price_vs_sma20_pct': round(
+                    (float(symbol_df['close_price'].iloc[-1]) - float(symbol_df['sma_20'].dropna().iloc[-1])) /
+                    float(symbol_df['sma_20'].dropna().iloc[-1]) * 100, 2
+                ) if not symbol_df['sma_20'].dropna().empty else None,
+                'avg_volume_vs_prior_week': round(
+                    float(symbol_df['volume'].iloc[-5:].mean()) / float(symbol_df['volume'].iloc[-10:-5].mean()), 2
+                ) if len(symbol_df) >= 10 else None
             }
 
     prompt = f"""
