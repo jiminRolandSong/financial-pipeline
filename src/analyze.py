@@ -1,9 +1,7 @@
-import os
 import json
+import logging
+import os
 import pandas as pd
-from anthropic import Anthropic
-from google.cloud import bigquery
-from google.oauth2 import service_account
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -11,23 +9,31 @@ env_path = Path(__file__).parent.parent / '.env'
 if env_path.exists():
     load_dotenv(dotenv_path=env_path)
 
+logger = logging.getLogger(__name__)
+
+ANOMALY_THRESHOLD = 0.03
+SMA_WINDOW = 20
+
 GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID')
 BQ_DATASET = os.getenv('BQ_DATASET')
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 
-creds_raw = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
-if creds_raw:
-    creds_json = json.loads(creds_raw)
-    credentials = service_account.Credentials.from_service_account_info(creds_json)
-    bq = bigquery.Client(project=GCP_PROJECT_ID, credentials=credentials)
-else:
-    bq = bigquery.Client(project=GCP_PROJECT_ID)
-    
-client = Anthropic(api_key=ANTHROPIC_API_KEY)
+
+def _make_bq_client():
+    from google.cloud import bigquery
+    from google.oauth2 import service_account
+    creds_raw = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+    if creds_raw:
+        creds_json = json.loads(creds_raw)
+        credentials = service_account.Credentials.from_service_account_info(creds_json)
+        return bigquery.Client(project=GCP_PROJECT_ID, credentials=credentials)
+    return bigquery.Client(project=GCP_PROJECT_ID)
+
 
 def fetch_weekly_data() -> pd.DataFrame:
+    bq = _make_bq_client()
     query = f"""
-        SELECT 
+        SELECT
             s.symbol,
             d.full_date,
             f.close_price,
@@ -40,13 +46,13 @@ def fetch_weekly_data() -> pd.DataFrame:
         WHERE PARSE_DATE('%Y-%m-%d', d.full_date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
         ORDER BY s.symbol, d.full_date
     """
-    df = bq.query(query).to_dataframe()
-    return df
+    return bq.query(query).to_dataframe()
+
 
 def detect_anomalies(df: pd.DataFrame) -> list:
     anomalies = []
     for _, row in df.iterrows():
-        if row['daily_return'] is not None and abs(row['daily_return']) > 0.03:
+        if row['daily_return'] is not None and abs(row['daily_return']) > ANOMALY_THRESHOLD:
             anomalies.append({
                 'symbol': row['symbol'],
                 'date': str(row['full_date']),
@@ -55,7 +61,11 @@ def detect_anomalies(df: pd.DataFrame) -> list:
             })
     return anomalies
 
+
 def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
+    from anthropic import Anthropic
+    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+
     summary_data = {}
     for symbol in df['symbol'].unique():
         symbol_df = df[df['symbol'] == symbol].sort_values('full_date')
@@ -71,18 +81,18 @@ def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
 
     prompt = f"""
     You are a financial analyst. Analyze this week's stock data and generate a concise report.
-    
+
     Weekly Data:
     {json.dumps(summary_data, indent=2)}
-    
-    Anomalies (daily return > 3%):
+
+    Anomalies (daily return > {ANOMALY_THRESHOLD * 100:.0f}%):
     {json.dumps(anomalies, indent=2)}
-    
+
     Return ONLY a JSON object with these exact keys:
     {{
         "summary": "2-3 sentence overview of the week",
         "tsla_analysis": "1-2 sentences on TSLA performance",
-        "nvda_analysis": "1-2 sentences on NVDA performance", 
+        "nvda_analysis": "1-2 sentences on NVDA performance",
         "anomalies_explanation": "explanation of any anomalies, or 'No significant anomalies this week'",
         "risk_score": <integer 1-10>,
         "outlook": "brief outlook for next week"
@@ -90,29 +100,31 @@ def generate_weekly_report(df: pd.DataFrame, anomalies: list) -> dict:
     """
 
     message = client.messages.create(
-        model="claude-sonnet-4-6",
+        model='claude-sonnet-4-6',
         max_tokens=1000,
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{'role': 'user', 'content': prompt}]
     )
 
     response_text = message.content[0].text
     clean = response_text.replace('```json', '').replace('```', '').strip()
     return json.loads(clean)
 
+
 def run():
-    print('Fetching weekly data from BigQuery...')
+    logger.info('Fetching weekly data from BigQuery...')
     df = fetch_weekly_data()
-    
-    print('Detecting anomalies...')
+
+    logger.info('Detecting anomalies...')
     anomalies = detect_anomalies(df)
-    print(f'Found {len(anomalies)} anomalies')
-    
-    print('Generating AI report...')
+    logger.info('Found %d anomalies', len(anomalies))
+
+    logger.info('Generating AI report...')
     report = generate_weekly_report(df, anomalies)
-    
-    print('\n=== WEEKLY REPORT ===')
-    print(json.dumps(report, indent=2))
+
+    logger.info('Weekly report: %s', json.dumps(report, indent=2))
     return report
 
+
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     run()
