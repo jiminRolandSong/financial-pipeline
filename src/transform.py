@@ -27,18 +27,16 @@ if env_path.exists():
 else:
     s3 = boto3.client('s3')
 
-
 STOCK_INFO = {
     'TSLA': {'company_name': 'Tesla Inc.', 'sector': 'Automotive', 'exchange': 'NASDAQ'},
     'NVDA': {'company_name': 'NVIDIA Corporation', 'sector': 'Semiconductors', 'exchange': 'NASDAQ'}
 }
 
 def read_from_s3(symbol: str) -> dict:
-    # 오늘 날짜로 먼저 시도, 없으면 가장 최근 파일 가져오기
     prefix = f'raw/{symbol}/daily_prices/'
     response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
-    
-    # 가장 최근 파일 선택
+    if 'Contents' not in response:
+        raise FileNotFoundError(f'No S3 data found for {symbol}')
     files = sorted([obj['Key'] for obj in response['Contents']])
     latest_key = files[-1]
     print(f'Reading: {latest_key}')
@@ -59,7 +57,7 @@ def build_dim_date(dates: list) -> pd.DataFrame:
             'month': dt.month,
             'week_of_year': dt.isocalendar()[1],
             'is_weekend': dt.weekday() >= 5,
-            'is_market_holiday': False  # 추후 pandas_market_calendars로 개선 가능
+            'is_market_holiday': False
         })
     return pd.DataFrame(rows).drop_duplicates(subset=['date_key'])
 
