@@ -1,15 +1,23 @@
 import os
+import json
 import pandas as pd
 from pathlib import Path
 from dotenv import load_dotenv
 from google.cloud import bigquery
+from google.oauth2 import service_account
 
 load_dotenv(dotenv_path=Path(__file__).parent.parent / '.env')
 
 GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID')
 BQ_DATASET = os.getenv('BQ_DATASET')
 
-bq = bigquery.Client(project=GCP_PROJECT_ID)
+creds_raw = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+if creds_raw:
+    creds_json = json.loads(creds_raw)
+    credentials = service_account.Credentials.from_service_account_info(creds_json)
+    bq = bigquery.Client(project=GCP_PROJECT_ID, credentials=credentials)
+else:
+    bq = bigquery.Client(project=GCP_PROJECT_ID)
 
 def load_to_bigquery(df: pd.DataFrame, table_name: str, unique_keys: list) -> None:
     table_id = f'{GCP_PROJECT_ID}.{BQ_DATASET}.{table_name}'

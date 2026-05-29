@@ -1,0 +1,5 @@
+boto3
+pandas
+google-cloud-bigquery
+pandas-gbq
+python-dotenv

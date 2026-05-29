@@ -2,24 +2,30 @@ import boto3
 import json
 import os
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parent))
 from load import load_to_bigquery
 
 from dotenv import load_dotenv
-load_dotenv(dotenv_path=Path(__file__).parent.parent / '.env')
+env_path = Path(__file__).parent.parent / '.env'
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
 
 S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID')
 BQ_DATASET = os.getenv('BQ_DATASET')
 
-s3 = boto3.client('s3',
-                  aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                  aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-                  region_name=os.getenv('AWS_REGION')
-)
+if env_path.exists():
+    s3 = boto3.client(
+        's3',
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        region_name=os.getenv('AWS_REGION')
+    )
+else:
+    s3 = boto3.client('s3')
 
 
 STOCK_INFO = {
@@ -57,7 +63,7 @@ def build_dim_date(dates: list) -> pd.DataFrame:
         })
     return pd.DataFrame(rows).drop_duplicates(subset=['date_key'])
 
-def build_dim_stock(symbols: str) -> pd.DataFrame:
+def build_dim_stock(symbols: list) -> pd.DataFrame:
     rows = []
     for i, symbol in enumerate(symbols):
         rows.append({
@@ -84,7 +90,7 @@ def build_fact_prices(symbol: str, stock_key: int, raw_data: dict) -> pd.DataFra
     df = pd.DataFrame(rows).sort_values('date_key')
     df['sma_20'] = df['close_price'].rolling(window=20).mean().round(4)
     df['daily_return'] = df['close_price'].pct_change().round(6)
-    df['ingested_at'] = datetime.utcnow().isoformat()
+    df['ingested_at'] = datetime.now(timezone.utc).isoformat()
     return df
 
     

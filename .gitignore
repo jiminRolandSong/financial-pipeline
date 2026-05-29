@@ -3,3 +3,8 @@ venv/
 __pycache__/
 *.pyc
 gcp-credentials.json
+lambda/extract_lambda/package/
+lambda/transform_load_lambda/package/
+lambda/extract_lambda/extract_lambda.zip
+lambda/transform_load_lambda/transform_load_lambda.zip
+pyrightconfig.json
