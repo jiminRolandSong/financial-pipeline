@@ -133,6 +133,19 @@ with tab2:
     else:
         st.caption(f'API key loaded: sk-ant-...{api_key[-6:]}')
 
+    if st.button('🔍 Test Anthropic Connection'):
+        import requests, socket
+        try:
+            ip = socket.gethostbyname('api.anthropic.com')
+            st.success(f'DNS OK — api.anthropic.com resolves to {ip}')
+        except Exception as e:
+            st.error(f'DNS FAIL: {e}')
+        try:
+            r = requests.get('https://api.anthropic.com', timeout=10)
+            st.success(f'HTTP OK — status {r.status_code}')
+        except Exception as e:
+            st.error(f'HTTP FAIL: {type(e).__name__}: {e}')
+
     if st.button('🤖 Generate Weekly Report'):
         with st.spinner('Analyzing with Claude AI...'):
             try:
